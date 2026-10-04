@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CHAT-ONLINE</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #chat-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 400px;
+        }
+
+        #chat-box {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        #input-container {
+            display: flex;
+            gap: 5px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        #send-button {
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        .message {
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #f0f0f0;
+            border-radius: 5px;
+        }
+    </style>
+
+
+</head>
+
+<body>
+
+    <div id="chat-container">
+
+        <div id="status"></div>
+
+        <h1>Chat Online</h1>
+
+        <div id="chat-box"></div>
+
+        <div id="input-container">
+            <input type="text" id="message-input" placeholder="Escreva sua mensagem..." autocomplete="off">
+
+            <button id="send-button">Enviar</button>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+
+    <script>
+
+        const socket = io();
+
+        let guid = localStorage.getItem('user-id');
+
+        if (!guid) {
+            guid = crypto.randomUUID();
+            localStorage.setItem('user-id', guid);
+        }
+
+        console.log("Meu GUID:", guid);
+
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        socket.on('connect', () => {
+            console.log('Conectado ao servidor:', socket.id);
+
+            socket.emit('user-connected', {
+                guid: guid
+            });
+        });
+
+
+        socket.on('message-received', (data) => {
+            adicionarMensagem(data);
+        });
+
+        socket.on("user-connected", (data) => {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = `Usuário conectado: ${data.id}`;
+            statusElement.style.color = 'green';
+            setTimeout(() => {
+                statusElement.textContent = '';
+            }, 3000);
+        });
+
+        socket.on("user-disconnected", (data) => {
+            const statusElement = document.getElementById('status');
+            statusElement.textContent = `Usuário desconectado: ${data.id}`;
+            statusElement.style.color = 'red';
+            setTimeout(() => {
+                statusElement.textContent = '';
+            }, 3000);
+        });
+
+        function enviarMensagem() {
+            const message = messageInput.value.trim();
+
+            if (!message) {
+                return;
+            }
+
+            socket.emit('send-message', {
+                guid: guid,
+                content: message
+            });
+
+            messageInput.value = '';
+            messageInput.focus();
+        }
+
+        function adicionarMensagem(data) {
+            const messageElement = document.createElement('div');
+
+            messageElement.classList.add('message');
+
+            messageElement.textContent = data.content;
+
+            if (data.guid === guid) {
+                messageElement.style.backgroundColor = '#d1ffd1';
+                messageElement.style.textAlign = 'right';
+            } else {
+                messageElement.style.backgroundColor = '#f0f0f0';
+                messageElement.style.textAlign = 'left';
+            }
+
+            chatBox.appendChild(messageElement);
+
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        sendButton.addEventListener('click', enviarMensagem);
+
+        messageInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                enviarMensagem();
+            }
+        });
+
+
+        async function carregarMensagens() {
+            try {
+                const response = await fetch('/messages');
+                const messages = await response.json();
+
+                messages.forEach((msg) => {
+                    adicionarMensagem(msg);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar mensagens:', error);
+            }
+        }
+         carregarMensagens();
+    </script>
+
+</body>
+
+</html>
